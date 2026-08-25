@@ -1,0 +1,101 @@
+# ---------------------------------------------------------------------------
+# Data contract between the Open-Meteo archive API (producer, external) and
+# this pipeline (consumer). It is machine readable: pipeline.contracts loads
+# this file and validates every landed batch against it, so the contract and
+# the code can never silently drift apart.
+# ---------------------------------------------------------------------------
+name: weather_observation
+version: 1
+status: active
+owner: data-engineering
+producer:
+  system: open-meteo
+  endpoint: /v1/archive
+  auth: none
+  docs: https://open-meteo.com/en/docs/historical-weather-api
+consumer:
+  system: batch-api-snowflake
+  target_table: WEATHER.RAW.WEATHER_OBSERVATION
+
+grain: one row per (city_id, observed_at_utc)
+primary_key: [city_id, observed_at_utc]
+partition_key: observation_date
+
+sla:
+  # The producer publishes a day of history with roughly a two day lag,
+  # so the pipeline never asks for anything newer than T-2.
+  source_lag_days: 2
+  freshness_warn_hours: 30
+  freshness_error_hours: 48
+
+fields:
+  - name: city_id
+    type: string
+    required: true
+    description: Stable slug we assign, not supplied by the API.
+  - name: latitude
+    type: float
+    required: true
+    min: -90.0
+    max: 90.0
+  - name: longitude
+    type: float
+    required: true
+    min: -180.0
+    max: 180.0
+  - name: observed_at_utc
+    type: timestamp
+    required: true
+    description: Start of the hourly observation window, always UTC.
+  - name: temperature_2m_c
+    type: float
+    required: false
+    min: -90.0
+    max: 60.0
+    description: Nullable - the API returns null for gaps in the station record.
+  - name: relative_humidity_2m_pct
+    type: float
+    required: false
+    min: 0.0
+    max: 100.0
+  - name: precipitation_mm
+    type: float
+    required: false
+    min: 0.0
+    max: 500.0
+  - name: wind_speed_10m_kmh
+    type: float
+    required: false
+    min: 0.0
+    max: 500.0
+  - name: weather_code
+    type: integer
+    required: false
+    description: WMO weather interpretation code.
+
+# Columns the pipeline adds itself. They are part of the contract with the
+# warehouse, not with the API.
+metadata_fields:
+  - name: _ingested_at_utc
+    type: timestamp
+  - name: _batch_id
+    type: string
+    description: Deterministic per (city_id, observation_date, contract_version).
+  - name: _source_payload_hash
+    type: string
+    description: sha256 of the raw API payload, used to skip unchanged reloads.
+  - name: _contract_version
+    type: integer
+
+compatibility:
+  policy: backward
+  rules:
+    # See docs/data_contract.md for the full decision table.
+    new_optional_field: non-breaking - landed in RAW, added to staging on demand
+    new_required_field: breaking - requires a new contract version
+    field_removed: breaking - requires a new contract version
+    type_widened: non-breaking - e.g. integer -> float
+    type_narrowed: breaking
+    semantic_change: breaking even when the type is identical (e.g. C -> F)
+  unknown_field_action: warn_and_keep
+  on_breaking_change: quarantine_batch_and_alert
