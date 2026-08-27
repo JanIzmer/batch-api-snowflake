@@ -1,0 +1,9 @@
+city_id,name,country_code,latitude,longitude,timezone_name,population
+berlin,Berlin,DE,52.52,13.405,Europe/Berlin,3576873
+warsaw,Warsaw,PL,52.2297,21.0122,Europe/Warsaw,1860281
+prague,Prague,CZ,50.0755,14.4378,Europe/Prague,1357326
+vienna,Vienna,AT,48.2082,16.3738,Europe/Vienna,2002821
+amsterdam,Amsterdam,NL,52.3676,4.9041,Europe/Amsterdam,921402
+madrid,Madrid,ES,40.4168,-3.7038,Europe/Madrid,3223334
+rome,Rome,IT,41.9028,12.4964,Europe/Rome,2761632
+stockholm,Stockholm,SE,59.3293,18.0686,Europe/Stockholm,975551
