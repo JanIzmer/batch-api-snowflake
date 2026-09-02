@@ -25,7 +25,19 @@ from pipeline.warehouse.connection import Connection
 
 log = get_logger(__name__)
 
-MERGE_TEMPLATE = (Path(__file__).parent / "ddl" / "003_merge.sql").read_text(encoding="utf-8")
+def _load_merge_template() -> str:
+    """Read the MERGE from disk with its leading comment block stripped.
+
+    Keeping the SQL in a .sql file makes it reviewable and lintable; stripping
+    the comments keeps the statement the driver sees identical to the statement
+    the tests assert on.
+    """
+    raw = (Path(__file__).parent / "ddl" / "003_merge.sql").read_text(encoding="utf-8")
+    body = "\n".join(line for line in raw.splitlines() if not line.strip().startswith("--"))
+    return body.strip().rstrip(";")
+
+
+MERGE_TEMPLATE = _load_merge_template()
 
 
 @dataclass(frozen=True)

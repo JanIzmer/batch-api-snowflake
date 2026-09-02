@@ -1,6 +1,7 @@
 -- ---------------------------------------------------------------------------
 -- The MERGE the loader runs, kept here so it can be read and tested on its own.
--- Placeholders in {braces} are filled by pipeline.warehouse.loader.
+-- The three placeholders below are filled in by pipeline.warehouse.loader
+-- via str.format, so this file must not contain any other curly braces.
 --
 -- Why MERGE and not COPY straight into the target:
 --   COPY INTO is append-only. Re-running a day would double the rows. The
