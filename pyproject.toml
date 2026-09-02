@@ -53,5 +53,6 @@ disallow_untyped_defs = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src", "."]
 addopts = "-q --strict-markers"
 markers = ["integration: talks to a real external system, skipped in CI"]
