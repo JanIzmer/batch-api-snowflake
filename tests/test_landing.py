@@ -1,0 +1,89 @@
+from __future__ import annotations
+
+from datetime import date
+
+import pyarrow.parquet as pq
+
+from pipeline.landing import (
+    cleanup_temp_files,
+    clear_partition,
+    existing_payload_hash,
+    partition_dir,
+    write_batch,
+)
+from pipeline.models import flatten_hourly
+from tests.conftest import hourly_payload
+
+
+def land(root, berlin, day, payload_hash="hash-a", hours=24):
+    observations = flatten_hourly(berlin, hourly_payload(hours=hours))
+    return write_batch(root, berlin.city_id, day, observations, payload_hash)
+
+
+def test_write_batch_lands_one_file_per_partition(tmp_path, berlin, day):
+    batch = land(tmp_path, berlin, day)
+
+    assert batch.row_count == 24
+    assert batch.path.exists()
+    assert batch.path.parent == partition_dir(tmp_path, day, "berlin")
+    assert list(batch.path.parent.glob("*.parquet")) == [batch.path]
+
+
+def test_rerunning_a_day_overwrites_instead_of_appending(tmp_path, berlin, day):
+    """The whole point of a deterministic filename: a retry cannot duplicate."""
+    first = land(tmp_path, berlin, day)
+    second = land(tmp_path, berlin, day)
+
+    assert first.path == second.path
+    assert len(list(first.path.parent.glob("*.parquet"))) == 1
+    assert pq.read_table(second.path).num_rows == 24
+
+
+def test_partitions_are_isolated_per_city_and_day(tmp_path, berlin, day):
+    land(tmp_path, berlin, day)
+    land(tmp_path, berlin, date(2026, 8, 21))
+
+    assert partition_dir(tmp_path, day, "berlin").exists()
+    assert partition_dir(tmp_path, date(2026, 8, 21), "berlin").exists()
+
+
+def test_metadata_columns_are_attached(tmp_path, berlin, day):
+    batch = land(tmp_path, berlin, day, payload_hash="hash-xyz")
+
+    table = pq.read_table(batch.path)
+    assert set(table.column_names) >= {
+        "_ingested_at_utc",
+        "_batch_id",
+        "_source_payload_hash",
+        "_contract_version",
+    }
+    assert table.column("_source_payload_hash")[0].as_py() == "hash-xyz"
+    assert table.column("_batch_id")[0].as_py() == batch.batch_id
+
+
+def test_existing_payload_hash_round_trips(tmp_path, berlin, day):
+    assert existing_payload_hash(tmp_path, "berlin", day) is None
+
+    land(tmp_path, berlin, day, payload_hash="hash-a")
+
+    assert existing_payload_hash(tmp_path, "berlin", day) == "hash-a"
+
+
+def test_clear_partition_removes_only_that_partition(tmp_path, berlin, day):
+    land(tmp_path, berlin, day)
+    land(tmp_path, berlin, date(2026, 8, 21))
+
+    clear_partition(tmp_path, day, "berlin")
+
+    assert not partition_dir(tmp_path, day, "berlin").exists()
+    assert partition_dir(tmp_path, date(2026, 8, 21), "berlin").exists()
+
+
+def test_cleanup_removes_leftovers_from_killed_tasks(tmp_path, berlin, day):
+    batch = land(tmp_path, berlin, day)
+    (batch.path.parent / ".abandoned.parquet.tmp").write_bytes(b"partial")
+
+    removed = cleanup_temp_files(tmp_path)
+
+    assert removed == 1
+    assert batch.path.exists()
