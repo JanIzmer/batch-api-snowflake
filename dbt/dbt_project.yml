@@ -1,0 +1,51 @@
+name: weather
+version: 1.0.0
+config-version: 2
+profile: weather
+
+model-paths: ["models"]
+# The seed lives at the repo root so the Python ingester and dbt read the very
+# same city list. See seeds/README.md.
+seed-paths: ["../seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  # Days of history re-aggregated on every incremental run. The producer
+  # restates recent history, so a strict "only new rows" filter would freeze
+  # yesterday's numbers at their first, incomplete value.
+  restatement_window_days: 7
+  # Hours expected per city per complete day. Used by the completeness test.
+  expected_hours_per_day: 24
+
+models:
+  weather:
+    +persist_docs:
+      relation: true
+      columns: true
+    staging:
+      +materialized: view
+      +schema: staging
+    marts:
+      +materialized: table
+      +schema: marts
+
+seeds:
+  weather:
+    +schema: staging
+    city_catalogue:
+      +column_types:
+        city_id: varchar(64)
+        country_code: varchar(2)
+        latitude: float
+        longitude: float
+        population: number(38,0)
+
+tests:
+  weather:
+    +store_failures: true
+    # Failing rows are kept so the on-call can look at *what* failed instead of
+    # re-running dbt with --store-failures at 3am.
+    +schema: ops

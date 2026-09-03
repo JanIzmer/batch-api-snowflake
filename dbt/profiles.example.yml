@@ -1,0 +1,43 @@
+# Copy to ~/.dbt/profiles.yml, or point DBT_PROFILES_DIR at a directory
+# containing it. Never commit a filled-in profiles.yml - it is git-ignored.
+weather:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE', 'TRANSFORMER') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE', 'WH_TRANSFORM_S') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE', 'WEATHER') }}"
+      schema: staging
+      threads: 4
+      client_session_keep_alive: false
+      query_tag: "dbt-dev"
+
+    ci:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
+      role: TRANSFORMER
+      warehouse: WH_TRANSFORM_S
+      # Every CI run builds into its own schema and drops it at the end, so two
+      # pull requests can never overwrite each other's models.
+      database: WEATHER_CI
+      schema: "ci_{{ env_var('GITHUB_RUN_ID', 'local') }}"
+      threads: 8
+      query_tag: "dbt-ci"
+
+    prod:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
+      role: TRANSFORMER
+      warehouse: WH_TRANSFORM_S
+      database: WEATHER
+      schema: staging
+      threads: 8
+      query_tag: "{{ env_var('AIRFLOW_CTX_DAG_RUN_ID', 'dbt-prod') }}"
