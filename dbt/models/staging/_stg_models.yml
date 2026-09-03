@@ -1,0 +1,86 @@
+version: 2
+
+models:
+  - name: stg_weather__observations
+    description: >
+      One row per (city_id, observed_at_utc), typed and deduplicated. This is
+      the contract between ingestion and everything downstream.
+    columns:
+      - name: observation_key
+        description: Surrogate key over the grain.
+        data_tests:
+          - unique
+          - not_null
+      - name: city_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_weather__cities')
+              field: city_id
+      - name: observed_at_utc
+        data_tests:
+          - not_null
+      - name: observation_date
+        data_tests:
+          - not_null
+      - name: contract_version
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [1]
+                quote: false
+      - name: temperature_c
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -90
+                max_value: 60
+                inclusive: true
+              config:
+                # A single impossible reading is a producer problem to raise,
+                # not a reason to block the marts from building.
+                severity: warn
+      - name: relative_humidity_pct
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+                inclusive: true
+              config:
+                severity: warn
+      - name: precipitation_mm
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 500
+                inclusive: true
+              config:
+                severity: warn
+
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - city_id
+              - observed_at_utc
+
+  - name: stg_weather__cities
+    description: The city catalogue, seeded from the same CSV the ingester reads.
+    columns:
+      - name: city_id
+        data_tests:
+          - unique
+          - not_null
+      - name: city_name
+        data_tests:
+          - not_null
+      - name: country_code
+        data_tests:
+          - not_null
+      - name: size_band
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['small', 'medium', 'large']

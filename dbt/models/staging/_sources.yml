@@ -1,0 +1,37 @@
+version: 2
+
+sources:
+  - name: weather_raw
+    database: "{{ env_var('SNOWFLAKE_DATABASE', 'WEATHER') }}"
+    schema: RAW
+    description: >
+      Landed by the Python ingester under data contract weather_observation v1.
+      Nothing else writes here and nothing reads it except staging.
+
+    # Freshness thresholds come straight from the contract's SLA block:
+    # the producer publishes with a ~2 day lag, so 30h of silence is a warning
+    # and 48h means we have already missed a load window.
+    freshness:
+      warn_after: {count: 30, period: hour}
+      error_after: {count: 48, period: hour}
+    loaded_at_field: _INGESTED_AT_UTC
+
+    tables:
+      - name: weather_observation
+        description: One row per city per hour, upserted on (city_id, observed_at_utc).
+        columns:
+          - name: city_id
+            description: Slug from seeds/city_catalogue.csv.
+          - name: observed_at_utc
+            description: Start of the hourly window, UTC, no DST.
+          - name: _batch_id
+            description: Deterministic id of the (city, day) batch that wrote the row.
+          - name: _source_payload_hash
+            description: sha256 of the API payload; unchanged hash means an unchanged reload.
+
+      - name: load_audit
+        description: One row per load attempt. The first place to look during an incident.
+        schema: OPS
+        columns:
+          - name: run_id
+            description: Airflow dag_run_id, also set as the Snowflake QUERY_TAG.
