@@ -1,0 +1,88 @@
+version: 2
+
+models:
+  - name: dim_city
+    description: One row per city in the catalogue, with observation coverage attached.
+    columns:
+      - name: city_id
+        description: Primary key.
+        data_tests:
+          - unique
+          - not_null
+      - name: city_name
+        data_tests: [not_null]
+      - name: observation_count
+        data_tests: [not_null]
+
+  - name: fct_weather_hourly
+    description: >
+      One row per city per hour. Upserted on observation_key, so a re-run of a
+      day corrects it instead of duplicating it.
+    columns:
+      - name: observation_key
+        description: Surrogate key over (city_id, observed_at_utc).
+        data_tests:
+          - unique
+          - not_null
+      - name: city_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_city')
+              field: city_id
+      - name: observed_at_utc
+        data_tests: [not_null]
+      - name: observation_date
+        data_tests: [not_null]
+      - name: hour_of_day_utc
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 23
+                inclusive: true
+
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - city_id
+              - observed_at_utc
+
+  - name: agg_weather_daily
+    description: One row per city per day. Incomplete days are published but flagged.
+    columns:
+      - name: city_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_city')
+              field: city_id
+      - name: observation_date
+        data_tests: [not_null]
+      - name: hours_observed
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 24
+                inclusive: true
+      - name: is_complete_day
+        data_tests: [not_null]
+      - name: avg_temperature_c
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -90
+                max_value: 60
+                inclusive: true
+              config:
+                severity: warn
+
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - city_id
+              - observation_date
