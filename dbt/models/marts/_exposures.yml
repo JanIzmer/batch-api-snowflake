@@ -1,0 +1,31 @@
+version: 2
+
+exposures:
+  - name: weather_ops_dashboard
+    label: Weather operations dashboard
+    type: dashboard
+    maturity: medium
+    url: https://bi.example.com/dashboards/weather-ops
+    description: >
+      Daily temperature and precipitation per city. This is the reason
+      agg_weather_daily has an SLA: the dashboard is refreshed at 07:00 UTC and
+      the pipeline must have finished by then.
+    depends_on:
+      - ref('agg_weather_daily')
+      - ref('dim_city')
+    owner:
+      name: Jan Izmer
+      email: data-engineering@example.com
+
+  - name: hourly_api_extract
+    label: Hourly extract for the forecasting service
+    type: application
+    maturity: low
+    description: >
+      Reads fct_weather_hourly directly. Listed here so `dbt ls --select
+      +exposure:hourly_api_extract` shows what breaking a column would affect.
+    depends_on:
+      - ref('fct_weather_hourly')
+    owner:
+      name: Jan Izmer
+      email: data-engineering@example.com
