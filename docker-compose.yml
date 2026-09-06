@@ -1,0 +1,96 @@
+# ---------------------------------------------------------------------------
+# Local stack: Postgres (Airflow metadata) + scheduler + webserver + a one-shot
+# CLI container. Snowflake is the only thing that is not local - credentials
+# come from .env.
+#
+#   make up        start the stack
+#   make ingest    run one day through the CLI container
+#   make dbt-build build the models
+# ---------------------------------------------------------------------------
+x-pipeline-image: &pipeline-image
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+  env_file:
+    - .env
+    - docker/airflow.env
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags
+    - ./airflow/logs:/opt/airflow/logs
+    - ./src:/opt/pipeline/src
+    - ./dbt:/opt/pipeline/dbt
+    - ./seeds:/opt/pipeline/seeds
+    - ./contracts:/opt/pipeline/contracts
+    - ./data:/opt/pipeline/data
+
+services:
+  airflow-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  airflow-init:
+    <<: *pipeline-image
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+    # Creating the pool here means the backfill DAG's concurrency cap exists
+    # from the first boot instead of being a thing someone forgets to set up.
+    command: >
+      bash -c "
+        airflow db migrate &&
+        airflow users create --username admin --password admin
+          --firstname admin --lastname admin --role Admin --email admin@example.com || true &&
+        airflow pools set weather_api 6 'Concurrent requests allowed against the weather API'
+      "
+    restart: on-failure
+
+  airflow-scheduler:
+    <<: *pipeline-image
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    command: scheduler
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname $${HOSTNAME}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  airflow-webserver:
+    <<: *pipeline-image
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # Not started by `up`; used for one-off commands:
+  #   docker compose run --rm cli weather-pipeline ingest --date 2026-08-20
+  cli:
+    <<: *pipeline-image
+    profiles: ["tools"]
+    entrypoint: [""]
+    working_dir: /opt/pipeline
+    command: ["weather-pipeline", "--help"]
+
+volumes:
+  airflow-db-data:
