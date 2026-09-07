@@ -1,0 +1,34 @@
+[sqlfluff]
+dialect = snowflake
+templater = dbt
+max_line_length = 120
+exclude_rules = RF04, ST06, AM04
+# RF04: dbt surrogate keys legitimately shadow keywords.
+# ST06: column order in staging follows the source, not alphabetical rules.
+# AM04: SELECT * in the `source` CTE is the dbt convention.
+
+[sqlfluff:templater:dbt]
+project_dir = ./dbt
+profiles_dir = ./dbt
+profile = weather
+target = dev
+
+[sqlfluff:indentation]
+tab_space_size = 4
+indented_joins = false
+indented_ctes = false
+
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.identifiers]
+extended_capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.functions]
+extended_capitalisation_policy = lower
+
+[sqlfluff:rules:aliasing.table]
+aliasing = explicit
+
+[sqlfluff:rules:references.keywords]
+ignore_words = name, date, hour, value
