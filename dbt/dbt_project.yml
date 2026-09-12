@@ -43,7 +43,7 @@ seeds:
         longitude: float
         population: number(38,0)
 
-tests:
+data_tests:
   weather:
     +store_failures: true
     # Failing rows are kept so the on-call can look at *what* failed instead of

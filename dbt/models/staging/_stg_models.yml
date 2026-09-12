@@ -26,16 +26,14 @@ models:
       - name: contract_version
         data_tests:
           - accepted_values:
-              arguments:
-                values: [1]
-                quote: false
+              values: [1]
+              quote: false
       - name: temperature_c
         data_tests:
           - dbt_utils.accepted_range:
-              arguments:
-                min_value: -90
-                max_value: 60
-                inclusive: true
+              min_value: -90
+              max_value: 60
+              inclusive: true
               config:
                 # A single impossible reading is a producer problem to raise,
                 # not a reason to block the marts from building.
@@ -43,28 +41,25 @@ models:
       - name: relative_humidity_pct
         data_tests:
           - dbt_utils.accepted_range:
-              arguments:
-                min_value: 0
-                max_value: 100
-                inclusive: true
+              min_value: 0
+              max_value: 100
+              inclusive: true
               config:
                 severity: warn
       - name: precipitation_mm
         data_tests:
           - dbt_utils.accepted_range:
-              arguments:
-                min_value: 0
-                max_value: 500
-                inclusive: true
+              min_value: 0
+              max_value: 500
+              inclusive: true
               config:
                 severity: warn
 
     data_tests:
       - dbt_utils.unique_combination_of_columns:
-          arguments:
-            combination_of_columns:
-              - city_id
-              - observed_at_utc
+          combination_of_columns:
+            - city_id
+            - observed_at_utc
 
   - name: stg_weather__cities
     description: The city catalogue, seeded from the same CSV the ingester reads.
@@ -82,5 +77,4 @@ models:
       - name: size_band
         data_tests:
           - accepted_values:
-              arguments:
-                values: ['small', 'medium', 'large']
+              values: ['small', 'medium', 'large']
