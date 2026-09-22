@@ -125,6 +125,21 @@ with DAG(
         )
         return summary.as_dict()
 
+    @task(task_id="restatement_window_days")
+    def restatement_window_days(params: dict | None = None) -> int:
+        """How wide the mart rebuild has to be for this backfill.
+
+        Computed in Python rather than in the Bash template. Date arithmetic in
+        Jinja needs filters Airflow does not ship (`as_datetime` is a dbt
+        filter, not an Airflow one), and a template that fails to render only
+        fails at execution - here, after every ingest task has already run.
+        """
+        params = params or {}
+        start = pendulum.parse(params["start_date"]).date()
+        end = pendulum.parse(params["end_date"]).date()
+        # Two days of slack so the boundary days are rebuilt as well.
+        return (end - start).days + 2
+
     # One dbt build for the whole range. The marts merge on their grain, so
     # rebuilding a wide window at the end is both cheaper and more correct than
     # rebuilding after every day.
@@ -133,9 +148,8 @@ with DAG(
         bash_command=(
             f"cd {DBT_DIR} && "
             "dbt build --target prod "
-            "--vars '{\"restatement_window_days\": {{ "
-            "(macros.ds_add(params.end_date, 0) | as_datetime - "
-            "(params.start_date | as_datetime)).days + 2 }}}'"
+            "--vars '{\"restatement_window_days\": "
+            "{{ ti.xcom_pull(task_ids='restatement_window_days') }}}'"
         ),
         env={
             "DBT_PROFILES_DIR": DBT_DIR,
@@ -165,4 +179,8 @@ with DAG(
 
     work_items = plan()
     ingested = ingest_unit.expand(unit=work_items)
-    ingested >> rebuild_marts >> verify(ingested)
+    window = restatement_window_days()
+
+    ingested >> rebuild_marts
+    window >> rebuild_marts
+    rebuild_marts >> verify(ingested)
