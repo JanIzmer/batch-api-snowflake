@@ -2,7 +2,7 @@
 # One image for both roles. Airflow workers and the standalone CLI run exactly
 # the same code, so "works on my machine" and "works in the DAG" cannot drift.
 # ---------------------------------------------------------------------------
-FROM apache/airflow:2.10.2-python3.11
+FROM apache/airflow:3.3.2-python3.11
 
 USER root
 RUN apt-get update \
