@@ -142,23 +142,20 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: DAGs import cleanly
-        # An ImportError in a DAG file does not fail a build - it just makes the
-        # DAG silently disappear from the scheduler. Catch it here instead.
+      - name: Validate DAGs
+        # Import, graph shape AND template rendering. The last one is the
+        # reason this job exists: Airflow renders templates at execution, so a
+        # bad Jinja filter in the final task of a backfill only shows up after
+        # every other task has already done its work.
         run: |
           docker run --rm \
             -e AIRFLOW__CORE__LOAD_EXAMPLES=False \
+            -e AIRFLOW__CORE__UNIT_TEST_MODE=True \
             -e PYTHONPATH=/opt/pipeline/src:/opt/airflow/dags \
             -v "${{ github.workspace }}/airflow/dags:/opt/airflow/dags" \
+            -v "${{ github.workspace }}/scripts:/opt/pipeline/scripts" \
             weather-pipeline:ci \
-            python -c "
-          from airflow.models import DagBag
-          bag = DagBag('/opt/airflow/dags', include_examples=False)
-          assert not bag.import_errors, bag.import_errors
-          print('DAGs loaded:', sorted(bag.dag_ids))
-          assert 'weather_batch_daily' in bag.dag_ids
-          assert 'weather_backfill' in bag.dag_ids
-          "
+            python /opt/pipeline/scripts/validate_dags.py /opt/airflow/dags
 
   ci-passed:
     name: CI passed

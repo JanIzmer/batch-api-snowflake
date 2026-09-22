@@ -32,6 +32,11 @@ fmt: ## Autoformat
 test: ## Unit tests
 	./.venv/bin/pytest --cov=pipeline --cov-report=term-missing
 
+.PHONY: validate-dags
+validate-dags: ## Import, graph and template checks for the DAGs (needs airflow installed)
+	AIRFLOW__CORE__LOAD_EXAMPLES=False AIRFLOW__CORE__UNIT_TEST_MODE=True \
+	PYTHONPATH=src:airflow/dags ./.venv/bin/python scripts/validate_dags.py airflow/dags
+
 .PHONY: up
 up: ## Start the local Airflow stack
 	docker compose up -d --build
