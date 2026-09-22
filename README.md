@@ -108,6 +108,7 @@ tests/              46 unit tests, no network, no warehouse
 ```
 
 Full detail lives in [`docs/`](docs/):
+[setup](docs/setup.md) ·
 [data contract](docs/data_contract.md) ·
 [idempotency & backfill](docs/idempotency.md) ·
 [failure modes](docs/failure_modes.md) ·
@@ -118,26 +119,33 @@ Full detail lives in [`docs/`](docs/):
 
 ## Quickstart
 
+**Without a Snowflake account** — the whole fetch → validate → quarantine →
+Parquet path runs locally, and so does everything that checks it:
+
+```bash
+make install && make test    # 46 unit tests, no network, no warehouse
+make validate-dags           # DAG import, graph and template rendering
+cd dbt && dbt deps && dbt parse --target dev   # 5 models, 40 tests, 1 seed
+weather-pipeline ingest --date 2026-09-08 --land-only
+```
+
+**With one:**
+
 ```bash
 cp .env.example .env          # fill in Snowflake credentials
 make up                       # Airflow at localhost:8080 (admin/admin)
 make apply-ddl                # create databases, schemas, stage, tables
 make ingest DATE=2026-09-08   # one day, all cities
+make ingest DATE=2026-09-08   # again - must report 0 inserted, 0 updated
 make dbt-build                # seed + staging + marts + tests
 ```
 
-No Snowflake account handy? `--land-only` runs the whole ingestion path and
-writes Parquet locally:
+That second `make ingest` is the point of the project: anything other than
+zeros means idempotency is broken.
 
-```bash
-docker compose run --rm cli weather-pipeline ingest --date 2026-09-08 --land-only
-```
-
-Unit tests need neither network nor warehouse:
-
-```bash
-make install && make test
-```
+Full prerequisites, the four Airflow Variables the DAGs read, and known
+first-run friction: [`docs/setup.md`](docs/setup.md). **CI needs no secrets** —
+it parses and validates, it never connects to Snowflake.
 
 ---
 
