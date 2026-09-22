@@ -115,7 +115,7 @@ with DAG(
     with TaskGroup(group_id="ingest") as ingest_group:
 
         @task(task_id="ingest_city", max_active_tis_per_dag=4)
-        def ingest_city(city_id: str, day: str, full_refresh: bool = False) -> dict:
+        def ingest_city(city_id: str, day: str) -> dict:
             """Ingest one (city, day). Idempotent: safe to retry at any point."""
             import sys
 
@@ -126,6 +126,13 @@ with DAG(
             from pipeline.run import run as run_pipeline
 
             context = get_current_context()
+            # Read the param from the context rather than templating it into a
+            # keyword argument. `op_kwargs` is a template field, so
+            # "{{ params.full_refresh }}" would arrive as the *string* "False",
+            # which is truthy - every scheduled run would silently do a full
+            # refresh and rewrite every landing partition.
+            full_refresh = bool(context["params"].get("full_refresh", False))
+
             summary = run_pipeline(
                 start=pendulum.parse(day).date(),
                 end=pendulum.parse(day).date(),
@@ -136,9 +143,7 @@ with DAG(
             )
             return summary.as_dict()
 
-        ingested = ingest_city.partial(
-            day=day, full_refresh="{{ params.full_refresh }}"
-        ).expand(city_id=city_ids)
+        ingested = ingest_city.partial(day=day).expand(city_id=city_ids)
 
     # dbt runs once for the whole day, not once per city: the marts are
     # incremental over a restatement window, so per-city runs would rebuild the
