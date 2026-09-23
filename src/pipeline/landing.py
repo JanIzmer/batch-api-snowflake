@@ -123,6 +123,29 @@ def write_batch(
     )
 
 
+def read_landed_file(path: Path, columns: list[str] | None = None) -> pa.Table:
+    """Read one landed file, ignoring the directory it sits in.
+
+    This has to go through ParquetFile rather than `pq.read_table`. The layout
+    deliberately encodes the partition keys twice: in the Hive path, because
+    that is what makes one (city, day) a directory that can be deleted and
+    rebuilt on its own, and inside the file, because Snowflake's COPY reads the
+    file directly and needs the columns to be there.
+
+    `pq.read_table` treats a path as a dataset, infers `city_id=berlin` from
+    the directory as a dictionary-typed partition column, and then fails to
+    merge it with the plain string column of the same name inside the file:
+
+        ArrowTypeError: Field city_id has incompatible types:
+        string vs dictionary<values=string, indices=int32>
+
+    ParquetFile reads the file and nothing else, so the duplication is
+    harmless. Anything that wants to scan the whole tree as a dataset must
+    pass `partitioning=None` for the same reason.
+    """
+    return pq.ParquetFile(path).read(columns=columns)
+
+
 def existing_payload_hash(root: Path | str, city_id: str, observation_date: date) -> str | None:
     """Hash of the payload already landed for this partition, if any.
 
@@ -136,7 +159,7 @@ def existing_payload_hash(root: Path | str, city_id: str, observation_date: date
     if not path.exists():
         return None
     try:
-        table = pq.read_table(path, columns=["_source_payload_hash"])
+        table = read_landed_file(path, columns=["_source_payload_hash"])
     except (OSError, pa.ArrowInvalid):  # pragma: no cover - corrupt local file
         log.warning("landing.unreadable", path=str(path))
         return None

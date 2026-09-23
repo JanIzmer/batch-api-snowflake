@@ -2,13 +2,12 @@ from __future__ import annotations
 
 from datetime import date
 
-import pyarrow.parquet as pq
-
 from pipeline.landing import (
     cleanup_temp_files,
     clear_partition,
     existing_payload_hash,
     partition_dir,
+    read_landed_file,
     write_batch,
 )
 from pipeline.models import flatten_hourly
@@ -36,7 +35,7 @@ def test_rerunning_a_day_overwrites_instead_of_appending(tmp_path, berlin, day):
 
     assert first.path == second.path
     assert len(list(first.path.parent.glob("*.parquet"))) == 1
-    assert pq.read_table(second.path).num_rows == 24
+    assert read_landed_file(second.path).num_rows == 24
 
 
 def test_partitions_are_isolated_per_city_and_day(tmp_path, berlin, day):
@@ -50,7 +49,7 @@ def test_partitions_are_isolated_per_city_and_day(tmp_path, berlin, day):
 def test_metadata_columns_are_attached(tmp_path, berlin, day):
     batch = land(tmp_path, berlin, day, payload_hash="hash-xyz")
 
-    table = pq.read_table(batch.path)
+    table = read_landed_file(batch.path)
     assert set(table.column_names) >= {
         "_ingested_at_utc",
         "_batch_id",
@@ -87,3 +86,24 @@ def test_cleanup_removes_leftovers_from_killed_tasks(tmp_path, berlin, day):
 
     assert removed == 1
     assert batch.path.exists()
+
+
+def test_the_tree_can_still_be_scanned_as_a_dataset(tmp_path, berlin, day):
+    """The partition keys live in the path AND in the file, on purpose.
+
+    The path is what makes one (city, day) a directory that can be dropped and
+    rebuilt; the columns are what Snowflake's COPY reads. A dataset scan has to
+    be told not to infer partitioning from the directories, or it tries to
+    merge a dictionary-typed `city_id` from the path with the string column of
+    the same name inside the file.
+    """
+    import pyarrow.parquet as pq
+
+    land(tmp_path, berlin, day)
+    land(tmp_path, berlin, date(2026, 8, 21))
+
+    table = pq.read_table(tmp_path / "weather_observation" / "v1", partitioning=None)
+
+    assert table.num_rows == 48
+    assert set(table.column("city_id").to_pylist()) == {"berlin"}
+    assert "observation_date" not in table.column_names  # it is in the path only
