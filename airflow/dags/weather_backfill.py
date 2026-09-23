@@ -24,7 +24,6 @@ from airflow.decorators import task
 from airflow.models.dag import DAG
 from airflow.models.param import Param
 from airflow.operators.bash import BashOperator
-
 from alerting import notify_on_retry, page_on_failure
 
 PROJECT_DIR = "/opt/pipeline"
@@ -148,7 +147,7 @@ with DAG(
         bash_command=(
             f"cd {DBT_DIR} && "
             "dbt build --target prod "
-            "--vars '{\"restatement_window_days\": "
+            '--vars \'{"restatement_window_days": '
             "{{ ti.xcom_pull(task_ids='restatement_window_days') }}}'"
         ),
         env={

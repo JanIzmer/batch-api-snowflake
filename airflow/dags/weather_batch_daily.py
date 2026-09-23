@@ -28,7 +28,6 @@ from airflow.models.dag import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.empty import EmptyOperator
 from airflow.utils.task_group import TaskGroup
-
 from alerting import notify_on_retry, notify_on_sla_miss, page_on_dag_failure, page_on_failure
 
 PROJECT_DIR = "/opt/pipeline"
@@ -75,7 +74,6 @@ with DAG(
         "full_refresh": False,
     },
 ) as dag:
-
     start = EmptyOperator(task_id="start")
 
     @task(task_id="target_date")
@@ -149,7 +147,6 @@ with DAG(
     # incremental over a restatement window, so per-city runs would rebuild the
     # same partitions eight times over.
     with TaskGroup(group_id="transform") as transform_group:
-
         dbt_deps = BashOperator(
             task_id="dbt_deps",
             bash_command=f"cd {DBT_DIR} && dbt deps --no-write-json",
@@ -175,7 +172,13 @@ with DAG(
 
         dbt_run = BashOperator(
             task_id="dbt_run",
-            bash_command=f"cd {DBT_DIR} && dbt build --target prod --select state:modified+ --defer --state ./state || dbt build --target prod",
+            # A plain full build. The state-comparison version of this
+            # (`--select state:modified+ --defer --state ./state`) needs a
+            # published manifest from the previous run, and nothing here
+            # publishes one - so it always failed straight into its `|| dbt
+            # build` fallback, which also swallowed genuine model failures.
+            # Slower and honest beats clever and wrong.
+            bash_command=f"cd {DBT_DIR} && dbt build --target prod",
             env=DBT_ENV,
             append_env=True,
         )
