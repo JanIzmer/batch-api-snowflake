@@ -56,7 +56,10 @@ def test_server_error_is_retried_then_succeeds(berlin, day):
 def test_rate_limit_is_treated_as_transient(berlin, day):
     respx.get(ARCHIVE).mock(return_value=httpx.Response(429, headers={"Retry-After": "1"}))
 
-    with make_client(max_retries=2) as client, pytest.raises(TransientApiError, match="rate limited"):
+    with (
+        make_client(max_retries=2) as client,
+        pytest.raises(TransientApiError, match="rate limited"),
+    ):
         client.fetch_hourly(berlin, day, day)
 
 

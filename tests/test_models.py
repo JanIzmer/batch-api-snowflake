@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, timezone
+from datetime import UTC, date
 
 import pytest
 
@@ -13,7 +13,7 @@ def test_flatten_produces_one_row_per_hour(berlin, payload):
 
     assert len(rows) == 24
     assert rows[0].city_id == "berlin"
-    assert rows[0].observed_at_utc.tzinfo == timezone.utc
+    assert rows[0].observed_at_utc.tzinfo == UTC
     assert rows[0].observation_date == date(2026, 8, 20)
 
 

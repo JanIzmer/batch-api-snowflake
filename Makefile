@@ -19,14 +19,14 @@ install: ## Create a local venv with dev dependencies
 
 .PHONY: lint
 lint: ## Ruff + mypy
-	./.venv/bin/ruff check src tests
-	./.venv/bin/ruff format --check src tests
+	./.venv/bin/ruff check src tests airflow scripts
+	./.venv/bin/ruff format --check src tests airflow scripts
 	./.venv/bin/mypy
 
 .PHONY: fmt
 fmt: ## Autoformat
-	./.venv/bin/ruff format src tests
-	./.venv/bin/ruff check --fix src tests
+	./.venv/bin/ruff format src tests airflow scripts
+	./.venv/bin/ruff check --fix src tests airflow scripts
 
 .PHONY: test
 test: ## Unit tests

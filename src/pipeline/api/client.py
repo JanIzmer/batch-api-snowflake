@@ -121,7 +121,7 @@ class WeatherApiClient:
             before_sleep=_log_retry,
             reraise=True,
         )(self._get_once)
-        return wrapped(path, params)  # type: ignore[no-any-return]
+        return wrapped(path, params)
 
     def _get_once(self, path: str, params: dict[str, Any]) -> dict[str, Any]:
         url = f"{self.base_url}{path}"
@@ -137,12 +137,10 @@ class WeatherApiClient:
         if response.status_code >= 500:
             raise TransientApiError(f"{url} returned {response.status_code}")
         if response.status_code >= 400:
-            raise PermanentApiError(
-                f"{url} returned {response.status_code}: {response.text[:500]}"
-            )
+            raise PermanentApiError(f"{url} returned {response.status_code}: {response.text[:500]}")
 
         try:
-            return response.json()  # type: ignore[no-any-return]
+            return response.json()
         except ValueError as exc:
             # A 200 with a non-JSON body is usually a proxy/captive portal, so
             # it is transient far more often than it is a real API change.

@@ -8,9 +8,11 @@ backfill needs no special code path and can be parallelised by Airflow.
 from __future__ import annotations
 
 from collections.abc import Iterator
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
+from typing import Any
 
 from pipeline.api.client import WeatherApiClient
 from pipeline.catalogue import load_cities
@@ -70,10 +72,13 @@ def ingest_day(
     payload = client.fetch_hourly(city, day, day)
     source_hash = payload_hash(payload)
 
-    if connection is not None and not full_refresh:
-        if already_loaded(connection, city.city_id, day, source_hash):  # type: ignore[arg-type]
-            log.info("run.skipped_unchanged", city_id=city.city_id, day=day.isoformat())
-            return 0, 0, 0
+    if (
+        connection is not None
+        and not full_refresh
+        and already_loaded(connection, city.city_id, day, source_hash)  # type: ignore[arg-type]
+    ):
+        log.info("run.skipped_unchanged", city_id=city.city_id, day=day.isoformat())
+        return 0, 0, 0
 
     observations = flatten_hourly(city, payload)
     if not observations:
@@ -143,14 +148,22 @@ def run(
     cleanup_temp_files(cfg.landing_zone_root)
     summary = RunSummary()
 
-    connection_ctx = (
-        snowflake_connection(cfg, query_tag=run_id) if not land_only else _null_context()
-    )
-    with connection_ctx as connection, WeatherApiClient(
-        base_url=cfg.weather_api_base_url,
-        timeout_seconds=cfg.weather_api_timeout_seconds,
-        max_retries=cfg.weather_api_max_retries,
-    ) as client:
+    # nullcontext rather than a conditional expression: a ternary over two
+    # unrelated context managers widens to `object`, and `with` on an `object`
+    # is exactly the kind of thing the type checker is here to catch.
+    connection_ctx: AbstractContextManager[Any]
+    if land_only:  # noqa: SIM108 - a ternary here widens the type to `object`
+        connection_ctx = nullcontext()
+    else:
+        connection_ctx = snowflake_connection(cfg, query_tag=run_id)
+    with (
+        connection_ctx as connection,
+        WeatherApiClient(
+            base_url=cfg.weather_api_base_url,
+            timeout_seconds=cfg.weather_api_timeout_seconds,
+            max_retries=cfg.weather_api_max_retries,
+        ) as client,
+    ):
         for day in date_range(start, end):
             for city in cities:
                 summary.partitions_attempted += 1
@@ -174,13 +187,3 @@ def run(
 
     log.info("run.finished", run_id=run_id, **summary.as_dict())
     return summary
-
-
-class _null_context:
-    """Stand-in for the Snowflake connection when running with --land-only."""
-
-    def __enter__(self) -> None:
-        return None
-
-    def __exit__(self, *exc_info: object) -> None:
-        return None

@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import shutil
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -81,7 +81,7 @@ def write_batch(
     source_payload_hash: str,
 ) -> LandedBatch:
     """Write one (city, day) partition atomically and return its descriptor."""
-    ingested_at = datetime.now(tz=timezone.utc)
+    ingested_at = datetime.now(tz=UTC)
     bid = batch_id(city_id, observation_date)
 
     records: list[dict[str, Any]] = []
@@ -129,7 +129,10 @@ def existing_payload_hash(root: Path | str, city_id: str, observation_date: date
     Used to short-circuit a re-run whose source data has not changed: we still
     want the run to succeed (so the DAG is green), we just skip the reload.
     """
-    path = partition_dir(Path(root), observation_date, city_id) / f"{batch_id(city_id, observation_date)}.parquet"
+    path = (
+        partition_dir(Path(root), observation_date, city_id)
+        / f"{batch_id(city_id, observation_date)}.parquet"
+    )
     if not path.exists():
         return None
     try:

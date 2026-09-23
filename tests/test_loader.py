@@ -11,7 +11,7 @@ from pipeline.warehouse.loader import already_loaded, load_batch
 
 
 class FakeCursor:
-    def __init__(self, connection: "FakeConnection") -> None:
+    def __init__(self, connection: FakeConnection) -> None:
         self._connection = connection
         self._result: list[tuple] = []
 

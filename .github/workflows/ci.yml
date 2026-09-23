@@ -35,8 +35,8 @@ jobs:
 
       - name: Ruff
         run: |
-          ruff check --output-format=github src tests airflow
-          ruff format --check src tests
+          ruff check --output-format=github src tests airflow scripts
+          ruff format --check src tests airflow scripts
 
       - name: Mypy
         run: mypy

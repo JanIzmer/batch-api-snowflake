@@ -49,9 +49,17 @@ class FieldSpec:
             return [f"{self.name}: expected {self.type}, got {type(value).__name__}"]
 
         problems: list[str] = []
-        if self.min is not None and float(value) < self.min:
+        if self.min is None and self.max is None:
+            return problems
+        if not isinstance(value, int | float):
+            # Range checks only apply to numbers; the type check above has
+            # already accepted whatever this is.
+            return problems
+
+        numeric = float(value)
+        if self.min is not None and numeric < self.min:
             problems.append(f"{self.name}: {value} below contract minimum {self.min}")
-        if self.max is not None and float(value) > self.max:
+        if self.max is not None and numeric > self.max:
             problems.append(f"{self.name}: {value} above contract maximum {self.max}")
         return problems
 

@@ -51,6 +51,13 @@ strict_optional = true
 warn_unused_ignores = true
 disallow_untyped_defs = true
 
+[[tool.mypy.overrides]]
+# These ship no type information and no stubs exist. Silencing the
+# import error is honest; the alternative is a blanket
+# ignore_missing_imports that also hides our own broken imports.
+module = ["pyarrow.*", "snowflake.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src", "."]

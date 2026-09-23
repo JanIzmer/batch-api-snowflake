@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -13,7 +13,7 @@ def row(**overrides):
         "city_id": "berlin",
         "latitude": 52.52,
         "longitude": 13.405,
-        "observed_at_utc": datetime(2026, 8, 20, 12, tzinfo=timezone.utc),
+        "observed_at_utc": datetime(2026, 8, 20, 12, tzinfo=UTC),
         "temperature_2m_c": 20.0,
         "relative_humidity_2m_pct": 50.0,
         "precipitation_mm": 0.0,

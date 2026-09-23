@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
@@ -46,8 +46,8 @@ class WeatherObservation(BaseModel):
     def _must_be_utc(cls, value: datetime) -> datetime:
         """Naive timestamps from the API are UTC by construction; make it explicit."""
         if value.tzinfo is None:
-            return value.replace(tzinfo=timezone.utc)
-        return value.astimezone(timezone.utc)
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
 
     @property
     def observation_date(self) -> date:
@@ -89,7 +89,7 @@ def flatten_hourly(city: City, payload: dict[str, Any]) -> list[WeatherObservati
         "wind_speed_10m_kmh": "wind_speed_10m",
         "weather_code": "weather_code",
     }
-    for target, source in mapping.items():
+    for source in mapping.values():
         series = hourly.get(source)
         if series is not None and len(series) != len(times):
             raise ValueError(

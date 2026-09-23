@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -121,7 +121,7 @@ def _write_quarantine(
             handle.write(
                 json.dumps(
                     {
-                        "_quarantined_at_utc": datetime.now(tz=timezone.utc).isoformat(),
+                        "_quarantined_at_utc": datetime.now(tz=UTC).isoformat(),
                         "_contract": f"{contract.name}.v{contract.version}",
                         "_reasons": reasons,
                         "row": row,

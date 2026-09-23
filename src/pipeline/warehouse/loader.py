@@ -15,7 +15,7 @@ finds the payload hash unchanged, so it updates nothing.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 from pipeline.landing import LandedBatch
@@ -24,6 +24,7 @@ from pipeline.models import CONTRACT_VERSION
 from pipeline.warehouse.connection import Connection
 
 log = get_logger(__name__)
+
 
 def _load_merge_template() -> str:
     """Read the MERGE from disk with its leading comment block stripped.
@@ -63,7 +64,7 @@ def load_batch(
     rows_fetched: int,
     rows_rejected: int,
 ) -> LoadResult:
-    started_at = datetime.now(tz=timezone.utc)
+    started_at = datetime.now(tz=UTC)
     cursor = connection.cursor()
     stage_path = _stage_path(batch.city_id, batch.observation_date)
 
@@ -187,7 +188,7 @@ def write_audit(
                 status,
                 error_message,
                 started_at.replace(tzinfo=None),
-                datetime.now(tz=timezone.utc).replace(tzinfo=None),
+                datetime.now(tz=UTC).replace(tzinfo=None),
             ),
         )
         connection.commit()
